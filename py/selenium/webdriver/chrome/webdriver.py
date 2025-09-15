@@ -26,6 +26,8 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 class WebDriver(ChromiumDriver):
     """Controls the ChromeDriver and allows you to drive the browser."""
 
+    service: Service
+
     def __init__(
         self,
         options: Optional[Options] = None,
