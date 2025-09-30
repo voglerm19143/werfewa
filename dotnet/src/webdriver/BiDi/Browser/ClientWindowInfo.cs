@@ -17,9 +17,11 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Communication;
+
 namespace OpenQA.Selenium.BiDi.Browser;
 
-public sealed record ClientWindowInfo(bool Active, ClientWindow ClientWindow, ClientWindowState State, int Height, int Width, int X, int Y);
+public sealed record ClientWindowInfo(bool Active, ClientWindow ClientWindow, ClientWindowState State, int Height, int Width, int X, int Y) : EmptyResult;
 
 public enum ClientWindowState
 {
