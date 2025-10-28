@@ -16,6 +16,7 @@
 # under the License.
 
 
+import warnings
 from typing import Any, Optional
 
 from selenium.webdriver.common.bidi.common import command_builder
@@ -62,7 +63,30 @@ class ClientWindowInfo:
         -------
             str: The state of the client window (one of the ClientWindowState constants).
         """
+        warnings.warn("get_state method is deprecated, use `state` property instead", DeprecationWarning, stacklevel=2)
         return self.state
+
+    @property
+    def state(self) -> str:
+        """Gets the state of the client window.
+
+        Returns:
+        -------
+            str: The state of the client window (one of the ClientWindowState constants).
+        """
+        return self._state
+
+    @state.setter
+    def state(self, value) -> None:
+        """Sets the state of the client window.
+
+        Returns: None
+        """
+        if not isinstance(value, str):
+            raise ValueError("state must be a string")
+        if value not in ClientWindowState.VALID_STATES:
+            raise ValueError(f"Invalid state: {value}. Must be one of {ClientWindowState.VALID_STATES}")
+        self._state = value
 
     def get_client_window(self) -> str:
         """Gets the client window identifier.
@@ -71,7 +95,32 @@ class ClientWindowInfo:
         -------
             str: The client window identifier.
         """
+        warnings.warn(
+            "get_client_window method is deprecated, use `client_window` property instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.client_window
+
+    @property
+    def client_window(self) -> str:
+        """Gets the client window identifier.
+
+        Returns:
+        -------
+            str: The client window identifier.
+        """
+        return self._client_window
+
+    @client_window.setter
+    def client_window(self, value) -> None:
+        """Sets the client window identifier.
+
+        Returns: None
+        """
+        if not isinstance(value, str):
+            raise ValueError("clientWindow must be a string")
+        self._client_window = value
 
     def get_width(self) -> int:
         """Gets the width of the client window.
@@ -80,7 +129,28 @@ class ClientWindowInfo:
         -------
             int: The width of the client window.
         """
+        warnings.warn("get_width method is deprecated, use `width` property instead", DeprecationWarning, stacklevel=2)
         return self.width
+
+    @property
+    def width(self) -> int:
+        """Gets the width of the client window.
+
+        Returns:
+        -------
+            int: The width of the client window.
+        """
+        return self._width
+
+    @width.setter
+    def width(self, value) -> None:
+        """Sets the width of the client window.
+
+        Returns: None
+        """
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(f"width must be a non-negative integer, got {value}")
+        self._width = value
 
     def get_height(self) -> int:
         """Gets the height of the client window.
@@ -89,7 +159,30 @@ class ClientWindowInfo:
         -------
             int: The height of the client window.
         """
+        warnings.warn(
+            "get_height method is deprecated, use `height` property instead", DeprecationWarning, stacklevel=2
+        )
         return self.height
+
+    @property
+    def height(self) -> int:
+        """Gets the height of the client window.
+
+        Returns:
+        -------
+            int: The height of the client window.
+        """
+        return self._height
+
+    @height.setter
+    def height(self, value) -> None:
+        """Sets the height of the client window.
+
+        Returns: None
+        """
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(f"height must be a non-negative integer, got {value}")
+        self._height = value
 
     def get_x(self) -> int:
         """Gets the x coordinate of the client window.
@@ -98,7 +191,28 @@ class ClientWindowInfo:
         -------
             int: The x coordinate of the client window.
         """
+        warnings.warn("get_x method is deprecated, use `x` property instead", DeprecationWarning, stacklevel=2)
         return self.x
+
+    @property
+    def x(self) -> int:
+        """Gets the x coordinate of the client window.
+
+        Returns:
+        -------
+            int: The x coordinate of the client window.
+        """
+        return self._x
+
+    @x.setter
+    def x(self, value) -> None:
+        """Sets the x coordinate of the client window.
+
+        Returns: None
+        """
+        if not isinstance(value, int):
+            raise ValueError(f"x must be an integer, got {type(value).__name__}")
+        self._x = value
 
     def get_y(self) -> int:
         """Gets the y coordinate of the client window.
@@ -107,7 +221,48 @@ class ClientWindowInfo:
         -------
             int: The y coordinate of the client window.
         """
+        warnings.warn("get_y method is deprecated, use `y` property instead", DeprecationWarning, stacklevel=2)
         return self.y
+
+    @property
+    def y(self) -> int:
+        """Gets the y coordinate of the client window.
+
+        Returns:
+        -------
+            int: The y coordinate of the client window.
+        """
+        return self._y
+
+    @y.setter
+    def y(self, value) -> None:
+        """Sets the y coordinate of the client window.
+
+        Returns: None
+        """
+        if not isinstance(value, int):
+            raise ValueError(f"y must be an integer, got {type(value).__name__}")
+        self._y = value
+
+    @property
+    def active(self) -> bool:
+        """Gets the Window Status.
+
+        Returns:
+        -------
+            bool: The boolen value of Window Status
+        """
+        return self._active
+
+    @active.setter
+    def active(self, value) -> None:
+        """Sets the Window Status.
+
+        Returns: None
+        """
+        if not isinstance(value, bool):
+            raise ValueError("active must be a boolean")
+        self._active = value
 
     def is_active(self) -> bool:
         """Checks if the client window is active.
@@ -116,6 +271,7 @@ class ClientWindowInfo:
         -------
             bool: True if the client window is active, False otherwise.
         """
+        warnings.warn("is_active method is deprecated, use `active` property instead", DeprecationWarning, stacklevel=2)
         return self.active
 
     @classmethod
@@ -129,59 +285,20 @@ class ClientWindowInfo:
         Returns:
         -------
             ClientWindowInfo: A new instance of ClientWindowInfo.
-
-        Raises:
-        ------
-            ValueError: If required fields are missing or have invalid types.
         """
-        try:
-            client_window = data["clientWindow"]
-            if not isinstance(client_window, str):
-                raise ValueError("clientWindow must be a string")
-
-            state = data["state"]
-            if not isinstance(state, str):
-                raise ValueError("state must be a string")
-            if state not in ClientWindowState.VALID_STATES:
-                raise ValueError(f"Invalid state: {state}. Must be one of {ClientWindowState.VALID_STATES}")
-
-            width = data["width"]
-            if not isinstance(width, int) or width < 0:
-                raise ValueError(f"width must be a non-negative integer, got {width}")
-
-            height = data["height"]
-            if not isinstance(height, int) or height < 0:
-                raise ValueError(f"height must be a non-negative integer, got {height}")
-
-            x = data["x"]
-            if not isinstance(x, int):
-                raise ValueError(f"x must be an integer, got {type(x).__name__}")
-
-            y = data["y"]
-            if not isinstance(y, int):
-                raise ValueError(f"y must be an integer, got {type(y).__name__}")
-
-            active = data["active"]
-            if not isinstance(active, bool):
-                raise ValueError("active must be a boolean")
-
-            return cls(
-                client_window=client_window,
-                state=state,
-                width=width,
-                height=height,
-                x=x,
-                y=y,
-                active=active,
-            )
-        except (KeyError, TypeError) as e:
-            raise ValueError(f"Invalid data format for ClientWindowInfo: {e}")
+        return cls(
+            client_window=data["clientWindow"],
+            state=data["state"],
+            width=data["width"],
+            height=data["height"],
+            x=data["x"],
+            y=data["y"],
+            active=data["active"],
+        )
 
 
 class Browser:
-    """
-    BiDi implementation of the browser module.
-    """
+    """BiDi implementation of the browser module."""
 
     def __init__(self, conn):
         self.conn = conn
