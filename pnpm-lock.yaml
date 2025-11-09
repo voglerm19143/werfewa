@@ -8,6 +8,12 @@ importers:
 
   .: {}
 
+  javascript/atoms:
+    devDependencies:
+      google-closure-deps:
+        specifier: ^20230802.0.0
+        version: 20230802.0.0
+
   javascript/grid-ui:
     dependencies:
       '@apollo/client':
@@ -4178,6 +4184,14 @@ packages:
       ignore: 5.3.2
       merge2: 1.4.1
       slash: 3.0.0
+    dev: true
+
+  /google-closure-deps@20230802.0.0:
+    resolution: {integrity: sha512-5xhXO8xgxdXYZMsc8ZRzmnCm4prm0TcD33tcNr8l3OjSBovFO9MpgtrZxH/ZVnZMny6oOBmdeNqcO3afCYY9Lw==}
+    hasBin: true
+    dependencies:
+      minimatch: 3.1.2
+      yargs: 16.2.0
     dev: true
 
   /gopd@1.2.0:
