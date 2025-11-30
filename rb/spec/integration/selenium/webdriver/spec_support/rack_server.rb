@@ -18,6 +18,10 @@
 # under the License.
 
 require 'rack'
+begin
+  require 'rackup'
+rescue LoadError
+end
 
 module Selenium
   module WebDriver
@@ -76,7 +80,7 @@ module Selenium
 
           handler = handlers.find { |h| load_handler h }
           constant = handler == 'webrick' ? 'WEBrick' : handler.capitalize
-          Rack::Handler.const_get constant
+          (defined?(Rackup) ? Rackup : Rack)::Handler.const_get(constant)
         end
 
         def load_handler(handler)
@@ -100,7 +104,7 @@ module Selenium
           BASIC_AUTH_CREDENTIALS = %w[test test].freeze
 
           def initialize(file_root)
-            @static = Rack::File.new(file_root)
+            @static = Rack::Files.new(file_root)
           end
 
           def call(env)
