@@ -22,13 +22,13 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.openqa.selenium.concurrent.ExecutorServices.shutdownGracefully;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -180,7 +180,10 @@ public class LocalNewSessionQueue extends NewSessionQueue implements Closeable {
                                   sessionRequest.getRequestId().equals(entry.getKey())))
               .filter(entry -> isTimedOut(now, entry.getValue()))
               .map(Map.Entry::getKey)
-              .collect(ImmutableSet.toImmutableSet());
+              .collect(
+                  Collectors.collectingAndThen(
+                      Collectors.toCollection(LinkedHashSet::new),
+                      set -> Collections.unmodifiableSet(new LinkedHashSet<>(set))));
     } finally {
       readLock.unlock();
     }
@@ -258,9 +261,9 @@ public class LocalNewSessionQueue extends NewSessionQueue implements Closeable {
         res.setStatus(HTTP_INTERNAL_ERROR)
             .setContent(
                 Contents.asJson(
-                    ImmutableMap.of(
+                    Map.of(
                         "value",
-                        ImmutableMap.of(
+                        Map.of(
                             "error", "session not created",
                             "message", result.left().getMessage(),
                             "stacktrace", result.left().getStackTrace()))));
