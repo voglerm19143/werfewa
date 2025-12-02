@@ -39,6 +39,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
 )
+from selenium.common.service import Service
 from selenium.webdriver.common.bidi.browser import Browser
 from selenium.webdriver.common.bidi.browsing_context import BrowsingContext
 from selenium.webdriver.common.bidi.emulation import Emulation
@@ -197,7 +198,7 @@ class WebDriver(BaseWebDriver):
 
     def __init__(
         self,
-        command_executor: str | RemoteConnection = "http://127.0.0.1:4444",
+        command_executor: str | RemoteConnection | Service = "http://127.0.0.1:4444",
         keep_alive: bool = True,
         file_detector: FileDetector | None = None,
         options: BaseOptions | list[BaseOptions] | None = None,
@@ -208,8 +209,9 @@ class WebDriver(BaseWebDriver):
         """Create a new driver instance that issues commands using the WebDriver protocol.
 
         Args:
-            command_executor: Either a string representing the URL of the remote
-                server or a custom remote_connection.RemoteConnection object.
+            command_executor: Either a string representing the URL of the remote server,
+                a Service (containing the URL of the remote server),
+                or a custom remote_connection.RemoteConnection object.
                 Defaults to 'http://127.0.0.1:4444/wd/hub'.
             keep_alive: (Deprecated) Whether to configure
                 remote_connection.RemoteConnection to use HTTP keep-alive.
@@ -234,10 +236,15 @@ class WebDriver(BaseWebDriver):
             capabilities = options.to_capabilities()
             _ignore_local_proxy = options._ignore_local_proxy
         self.command_executor = command_executor
+        if isinstance(self.command_executor, Service):
+            # Make sure the service doesn't drop before this drops.
+            # We don't use it, so it shouldn't be defined in types.
+            self._service = self.command_executor  # type: ignore[attr-defined]
+            self.command_executor = self.command_executor.service_url
         if isinstance(self.command_executor, (str, bytes)):
             self.command_executor = get_remote_connection(
                 capabilities,
-                command_executor=command_executor,
+                command_executor=self.command_executor,
                 keep_alive=keep_alive,
                 ignore_local_proxy=_ignore_local_proxy,
                 client_config=client_config,
