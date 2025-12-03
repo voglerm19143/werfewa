@@ -17,17 +17,10 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
+using System.Text.Json.Serialization;
+
 namespace OpenQA.Selenium.BiDi.Script;
 
-public sealed class Handle
-{
-    private readonly BiDi _bidi;
-
-    public Handle(BiDi bidi, string id)
-    {
-        _bidi = bidi;
-        Id = id;
-    }
-
-    public string Id { get; }
-}
+[JsonConverter(typeof(HandleConverter))]
+public sealed record Handle(string Id);

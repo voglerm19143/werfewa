@@ -17,8 +17,8 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -26,7 +26,7 @@ namespace OpenQA.Selenium.BiDi.Input;
 
 public sealed class InputModule : Module
 {
-    private InputJsonSerializerContext _jsonContext = null!;
+    private static readonly InputJsonSerializerContext _jsonContext = InputJsonSerializerContext.Default;
 
     public async Task<PerformActionsResult> PerformActionsAsync(BrowsingContext.BrowsingContext context, IEnumerable<SourceActions> actions, PerformActionsOptions? options = null)
     {
@@ -48,11 +48,6 @@ public sealed class InputModule : Module
 
         return await Broker.ExecuteCommandAsync(new SetFilesCommand(@params), options, _jsonContext.SetFilesCommand, _jsonContext.SetFilesResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new InputJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(PerformActionsCommand))]
@@ -65,4 +60,12 @@ public sealed class InputModule : Module
 [JsonSerializable(typeof(IEnumerable<IKeySourceAction>))]
 [JsonSerializable(typeof(IEnumerable<INoneSourceAction>))]
 [JsonSerializable(typeof(IEnumerable<IWheelSourceAction>))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class InputJsonSerializerContext : JsonSerializerContext;

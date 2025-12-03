@@ -17,9 +17,9 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -27,7 +27,7 @@ namespace OpenQA.Selenium.BiDi.Network;
 
 public sealed partial class NetworkModule : Module
 {
-    private NetworkJsonSerializerContext _jsonContext = null!;
+    private static readonly NetworkJsonSerializerContext _jsonContext = NetworkJsonSerializerContext.Default;
 
     public async Task<Collector> AddDataCollectorAsync(IEnumerable<DataType> DataTypes, int MaxEncodedDataSize, AddDataCollectorOptions? options = null)
     {
@@ -38,13 +38,11 @@ public sealed partial class NetworkModule : Module
         return result.Collector;
     }
 
-    public async Task<Intercept> AddInterceptAsync(IEnumerable<InterceptPhase> phases, AddInterceptOptions? options = null)
+    public async Task<AddInterceptResult> AddInterceptAsync(IEnumerable<InterceptPhase> phases, AddInterceptOptions? options = null)
     {
         var @params = new AddInterceptParameters(phases, options?.Contexts, options?.UrlPatterns);
 
-        var result = await Broker.ExecuteCommandAsync(new AddInterceptCommand(@params), options, _jsonContext.AddInterceptCommand, _jsonContext.AddInterceptResult).ConfigureAwait(false);
-
-        return result.Intercept;
+        return await Broker.ExecuteCommandAsync(new AddInterceptCommand(@params), options, _jsonContext.AddInterceptCommand, _jsonContext.AddInterceptResult).ConfigureAwait(false);
     }
 
     public async Task<RemoveDataCollectorResult> RemoveDataCollectorAsync(Collector collector, RemoveDataCollectorOptions? options = null)
@@ -176,11 +174,6 @@ public sealed partial class NetworkModule : Module
     {
         return await Broker.SubscribeAsync("network.authRequired", handler, options, _jsonContext.AuthRequiredEventArgs).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new NetworkJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(AddDataCollectorCommand))]
@@ -213,4 +206,12 @@ public sealed partial class NetworkModule : Module
 [JsonSerializable(typeof(ResponseCompletedEventArgs))]
 [JsonSerializable(typeof(FetchErrorEventArgs))]
 [JsonSerializable(typeof(AuthRequiredEventArgs))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class NetworkJsonSerializerContext : JsonSerializerContext;

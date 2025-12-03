@@ -17,7 +17,7 @@
 // under the License.
 // </copyright>
 
-using System.Text.Json;
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -25,7 +25,7 @@ namespace OpenQA.Selenium.BiDi.Browser;
 
 public sealed class BrowserModule : Module
 {
-    private BrowserJsonSerializerContext _jsonContext = null!;
+    private static readonly BrowserJsonSerializerContext _jsonContext = BrowserJsonSerializerContext.Default;
 
     public async Task<CloseResult> CloseAsync(CloseOptions? options = null)
     {
@@ -77,11 +77,6 @@ public sealed class BrowserModule : Module
 
         return await Broker.ExecuteCommandAsync(new SetDownloadBehaviorCommand(@params), options, _jsonContext.SetDownloadBehaviorCommand, _jsonContext.SetDownloadBehaviorResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new BrowserJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(CloseCommand))]
@@ -96,4 +91,12 @@ public sealed class BrowserModule : Module
 [JsonSerializable(typeof(GetClientWindowsResult))]
 [JsonSerializable(typeof(SetDownloadBehaviorCommand))]
 [JsonSerializable(typeof(SetDownloadBehaviorResult))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class BrowserJsonSerializerContext : JsonSerializerContext;

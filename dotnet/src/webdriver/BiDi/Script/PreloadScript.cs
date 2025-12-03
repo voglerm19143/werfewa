@@ -17,30 +17,10 @@
 // under the License.
 // </copyright>
 
-using System;
-using System.Threading.Tasks;
+using OpenQA.Selenium.BiDi.Json.Converters;
+using System.Text.Json.Serialization;
 
 namespace OpenQA.Selenium.BiDi.Script;
 
-public sealed class PreloadScript : IAsyncDisposable
-{
-    private readonly BiDi _bidi;
-
-    public PreloadScript(BiDi bidi, string id)
-    {
-        _bidi = bidi;
-        Id = id;
-    }
-
-    public string Id { get; }
-
-    public Task RemoveAsync()
-    {
-        return _bidi.Script.RemovePreloadScriptAsync(this);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await RemoveAsync().ConfigureAwait(false);
-    }
-}
+[JsonConverter(typeof(PreloadScriptConverter))]
+public sealed record PreloadScript(string Id);

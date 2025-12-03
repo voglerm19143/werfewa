@@ -17,46 +17,10 @@
 // under the License.
 // </copyright>
 
-using System;
-using System.Threading.Tasks;
+using OpenQA.Selenium.BiDi.Json.Converters;
+using System.Text.Json.Serialization;
 
 namespace OpenQA.Selenium.BiDi.Browser;
 
-public sealed class UserContext : IEquatable<UserContext>, IAsyncDisposable
-{
-    private readonly BiDi _bidi;
-
-    internal UserContext(BiDi bidi, string id)
-    {
-        _bidi = bidi;
-        Id = id;
-    }
-
-    internal string Id { get; }
-
-    public Task RemoveAsync()
-    {
-        return _bidi.Browser.RemoveUserContextAsync(this);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await RemoveAsync().ConfigureAwait(false);
-    }
-
-    public bool Equals(UserContext? other)
-    {
-        return other is not null && string.Equals(Id, other.Id, StringComparison.Ordinal);
-    }
-
-
-    public override bool Equals(object? obj)
-    {
-        return Equals(obj as UserContext);
-    }
-
-    public override int GetHashCode()
-    {
-        return StringComparer.Ordinal.GetHashCode(Id);
-    }
-}
+[JsonConverter(typeof(BrowserUserContextConverter))]
+public sealed record UserContext(string Id);

@@ -17,8 +17,8 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -26,7 +26,7 @@ namespace OpenQA.Selenium.BiDi.Log;
 
 public sealed class LogModule : Module
 {
-    private LogJsonSerializerContext _jsonContext = null!;
+    private static readonly LogJsonSerializerContext _jsonContext = LogJsonSerializerContext.Default;
 
     public async Task<Subscription> OnEntryAddedAsync(Func<LogEntry, Task> handler, SubscriptionOptions? options = null)
     {
@@ -36,11 +36,6 @@ public sealed class LogModule : Module
     public async Task<Subscription> OnEntryAddedAsync(Action<LogEntry> handler, SubscriptionOptions? options = null)
     {
         return await Broker.SubscribeAsync("log.entryAdded", handler, options, _jsonContext.LogEntry).ConfigureAwait(false);
-    }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new LogJsonSerializerContext(options);
     }
 }
 
@@ -80,4 +75,12 @@ public sealed class LogModule : Module
 #endregion
 
 [JsonSerializable(typeof(LogEntry))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class LogJsonSerializerContext : JsonSerializerContext;

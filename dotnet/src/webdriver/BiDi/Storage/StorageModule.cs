@@ -17,7 +17,7 @@
 // under the License.
 // </copyright>
 
-using System.Text.Json;
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -25,7 +25,7 @@ namespace OpenQA.Selenium.BiDi.Storage;
 
 public sealed class StorageModule : Module
 {
-    private StorageJsonSerializerContext _jsonContext = null!;
+    private static readonly StorageJsonSerializerContext _jsonContext = StorageJsonSerializerContext.Default;
 
     public async Task<GetCookiesResult> GetCookiesAsync(GetCookiesOptions? options = null)
     {
@@ -47,11 +47,6 @@ public sealed class StorageModule : Module
 
         return await Broker.ExecuteCommandAsync(new SetCookieCommand(@params), options, _jsonContext.SetCookieCommand, _jsonContext.SetCookieResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new StorageJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(GetCookiesCommand))]
@@ -60,4 +55,12 @@ public sealed class StorageModule : Module
 [JsonSerializable(typeof(SetCookieResult))]
 [JsonSerializable(typeof(DeleteCookiesCommand))]
 [JsonSerializable(typeof(DeleteCookiesResult))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class StorageJsonSerializerContext : JsonSerializerContext;

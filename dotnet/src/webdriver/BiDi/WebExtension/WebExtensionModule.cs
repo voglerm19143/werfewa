@@ -17,7 +17,7 @@
 // under the License.
 // </copyright>
 
-using System.Text.Json;
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -25,7 +25,7 @@ namespace OpenQA.Selenium.BiDi.WebExtension;
 
 public sealed class WebExtensionModule : Module
 {
-    private WebExtensionJsonSerializerContext _jsonContext = null!;
+    private static readonly WebExtensionJsonSerializerContext _jsonContext = WebExtensionJsonSerializerContext.Default;
 
     public async Task<InstallResult> InstallAsync(ExtensionData extensionData, InstallOptions? options = null)
     {
@@ -40,15 +40,18 @@ public sealed class WebExtensionModule : Module
 
         return await Broker.ExecuteCommandAsync(new UninstallCommand(@params), options, _jsonContext.UninstallCommand, _jsonContext.UninstallResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new WebExtensionJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(InstallCommand))]
 [JsonSerializable(typeof(InstallResult))]
 [JsonSerializable(typeof(UninstallCommand))]
 [JsonSerializable(typeof(UninstallResult))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class WebExtensionJsonSerializerContext : JsonSerializerContext;

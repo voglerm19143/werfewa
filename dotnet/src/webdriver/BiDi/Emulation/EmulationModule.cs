@@ -17,7 +17,7 @@
 // under the License.
 // </copyright>
 
-using System.Text.Json;
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -25,7 +25,7 @@ namespace OpenQA.Selenium.BiDi.Emulation;
 
 public sealed class EmulationModule : Module
 {
-    private EmulationJsonSerializerContext _jsonContext = null!;
+    private static readonly EmulationJsonSerializerContext _jsonContext = EmulationJsonSerializerContext.Default;
 
     public async Task<SetTimezoneOverrideResult> SetTimezoneOverrideAsync(string? timezone, SetTimezoneOverrideOptions? options = null)
     {
@@ -91,11 +91,6 @@ public sealed class EmulationModule : Module
 
         return await Broker.ExecuteCommandAsync(new SetGeolocationOverrideCommand(@params), options, _jsonContext.SetGeolocationOverrideCommand, _jsonContext.SetGeolocationOverrideResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new EmulationJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(SetTimezoneOverrideCommand))]
@@ -112,4 +107,12 @@ public sealed class EmulationModule : Module
 [JsonSerializable(typeof(SetScreenOrientationOverrideResult))]
 [JsonSerializable(typeof(SetGeolocationOverrideCommand))]
 [JsonSerializable(typeof(SetGeolocationOverrideResult))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class EmulationJsonSerializerContext : JsonSerializerContext;

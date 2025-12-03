@@ -17,10 +17,10 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -28,7 +28,7 @@ namespace OpenQA.Selenium.BiDi.Script;
 
 public sealed class ScriptModule : Module
 {
-    private ScriptJsonSerializerContext _jsonContext = null!;
+    private static readonly ScriptJsonSerializerContext _jsonContext = ScriptJsonSerializerContext.Default;
 
     public async Task<EvaluateResult> EvaluateAsync([StringSyntax(StringSyntaxConstants.JavaScript)] string expression, bool awaitPromise, Target target, EvaluateOptions? options = null)
     {
@@ -115,11 +115,6 @@ public sealed class ScriptModule : Module
     {
         return await Broker.SubscribeAsync("script.realmDestroyed", handler, options, _jsonContext.RealmDestroyedEventArgs).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new ScriptJsonSerializerContext(options);
-    }
 }
 
 #region https://github.com/dotnet/runtime/issues/72604
@@ -178,4 +173,12 @@ public sealed class ScriptModule : Module
 
 [JsonSerializable(typeof(MessageEventArgs))]
 [JsonSerializable(typeof(RealmDestroyedEventArgs))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class ScriptJsonSerializerContext : JsonSerializerContext;

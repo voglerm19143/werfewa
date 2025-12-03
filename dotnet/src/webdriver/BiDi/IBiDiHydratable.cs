@@ -1,4 +1,4 @@
-// <copyright file="Realm.cs" company="Selenium Committers">
+// <copyright file="IBiDiHydratable.cs" company="Selenium Committers">
 // Licensed to the Software Freedom Conservancy (SFC) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -17,10 +17,9 @@
 // under the License.
 // </copyright>
 
-using OpenQA.Selenium.BiDi.Json.Converters;
-using System.Text.Json.Serialization;
+namespace OpenQA.Selenium.BiDi;
 
-namespace OpenQA.Selenium.BiDi.Script;
-
-[JsonConverter(typeof(RealmConverter))]
-public sealed record Realm(string Id);
+public interface IBiDiHydratable
+{
+    internal void Hydrate(BiDi bidi);
+}

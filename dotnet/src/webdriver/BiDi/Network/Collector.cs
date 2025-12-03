@@ -17,42 +17,10 @@
 // under the License.
 // </copyright>
 
-using System;
-using System.Threading.Tasks;
+using OpenQA.Selenium.BiDi.Json.Converters;
+using System.Text.Json.Serialization;
 
 namespace OpenQA.Selenium.BiDi.Network;
 
-public sealed class Collector : IAsyncDisposable
-{
-    private readonly BiDi _bidi;
-
-    internal Collector(BiDi bidi, string id)
-    {
-        _bidi = bidi;
-        Id = id;
-    }
-
-    internal string Id { get; }
-
-    public async Task RemoveAsync()
-    {
-        await _bidi.Network.RemoveDataCollectorAsync(this).ConfigureAwait(false);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await RemoveAsync();
-    }
-
-    public override bool Equals(object? obj)
-    {
-        if (obj is Collector collectortObj) return collectortObj.Id == Id;
-
-        return false;
-    }
-
-    public override int GetHashCode()
-    {
-        return Id.GetHashCode();
-    }
-}
+[JsonConverter(typeof(CollectorConverter))]
+public sealed record Collector(string Id);

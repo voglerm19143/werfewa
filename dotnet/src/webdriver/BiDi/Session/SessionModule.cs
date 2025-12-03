@@ -17,8 +17,8 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -26,7 +26,7 @@ namespace OpenQA.Selenium.BiDi.Session;
 
 internal sealed class SessionModule : Module
 {
-    private SessionJsonSerializerContext _jsonContext = null!;
+    private static readonly SessionJsonSerializerContext _jsonContext = SessionJsonSerializerContext.Default;
 
     public async Task<StatusResult> StatusAsync(StatusOptions? options = null)
     {
@@ -58,11 +58,6 @@ internal sealed class SessionModule : Module
     {
         return await Broker.ExecuteCommandAsync(new EndCommand(), options, _jsonContext.EndCommand, _jsonContext.EndResult).ConfigureAwait(false);
     }
-
-    protected override void Initialize(JsonSerializerOptions options)
-    {
-        _jsonContext = new SessionJsonSerializerContext(options);
-    }
 }
 
 [JsonSerializable(typeof(StatusCommand))]
@@ -75,4 +70,12 @@ internal sealed class SessionModule : Module
 [JsonSerializable(typeof(SubscribeResult))]
 [JsonSerializable(typeof(UnsubscribeByIdCommand))]
 [JsonSerializable(typeof(UnsubscribeResult))]
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    Converters = [typeof(DateTimeOffsetConverter)])]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
 internal partial class SessionJsonSerializerContext : JsonSerializerContext;

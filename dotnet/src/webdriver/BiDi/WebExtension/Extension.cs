@@ -17,24 +17,10 @@
 // under the License.
 // </copyright>
 
-using System.Threading.Tasks;
+using OpenQA.Selenium.BiDi.Json.Converters;
+using System.Text.Json.Serialization;
 
 namespace OpenQA.Selenium.BiDi.WebExtension;
 
-public sealed class Extension
-{
-    private readonly BiDi _bidi;
-
-    public Extension(BiDi bidi, string id)
-    {
-        _bidi = bidi;
-        Id = id;
-    }
-
-    internal string Id { get; }
-
-    public Task UninstallAsync(UninstallOptions? options = null)
-    {
-        return _bidi.WebExtension.UninstallAsync(this, options);
-    }
-}
+[JsonConverter(typeof(WebExtensionConverter))]
+public sealed record Extension(string Id);
