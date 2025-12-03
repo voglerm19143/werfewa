@@ -77,7 +77,7 @@ class ClientConfig:
 
     def __init__(
         self,
-        remote_server_addr: str,
+        remote_server_addr: str | None = None,
         keep_alive: bool | None = True,
         proxy: Proxy | None = Proxy(raw={"proxyType": ProxyType.SYSTEM}),
         ignore_certificates: bool | None = False,
@@ -91,7 +91,7 @@ class ClientConfig:
         user_agent: str | None = None,
         extra_headers: dict | None = None,
         websocket_timeout: float | None = 30.0,
-        websocket_interval: float | None = 0.1,
+        websocket_interval: float | None = 0.1
     ) -> None:
         self.remote_server_addr = remote_server_addr
         self.keep_alive = keep_alive

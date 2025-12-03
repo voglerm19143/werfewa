@@ -17,6 +17,7 @@
 
 
 from selenium.webdriver.common.driver_finder import DriverFinder
+from selenium.webdriver.common.utils import normalize_local_driver_config
 from selenium.webdriver.ie.options import Options
 from selenium.webdriver.ie.service import Service
 from selenium.webdriver.remote.client_config import ClientConfig
@@ -32,6 +33,7 @@ class WebDriver(RemoteWebDriver):
         options: Options | None = None,
         service: Service | None = None,
         keep_alive: bool = True,
+        client_config: Optional[ClientConfig] = None,
     ) -> None:
         """Creates a new instance of the Ie driver.
 
@@ -41,6 +43,20 @@ class WebDriver(RemoteWebDriver):
             options: IE Options instance, providing additional IE options
             service: (Optional) service instance for managing the starting and stopping of the driver.
             keep_alive: Whether to configure RemoteConnection to use HTTP keep-alive.
+                This parameter is ignored if client_config is provided.
+            client_config: ClientConfig instance for advanced HTTP/WebSocket configuration.
+                If provided, takes precedence over individual parameters like keep_alive.
+
+        Example:
+            Basic usage::
+
+                driver = webdriver.Ie()
+
+            With custom config::
+
+                from selenium.webdriver.remote.client_config import ClientConfig
+                config = ClientConfig(websocket_timeout=10)
+                driver = webdriver.Ie(client_config=config)
         """
         self.service = service if service else Service()
         options = options if options else Options()
@@ -48,7 +64,10 @@ class WebDriver(RemoteWebDriver):
         self.service.path = self.service.env_path() or DriverFinder(self.service, options).get_driver_path()
         self.service.start()
 
-        client_config = ClientConfig(remote_server_addr=self.service.service_url, keep_alive=keep_alive, timeout=120)
+        client_config = normalize_local_driver_config(
+            self.service.service_url, user_config=client_config, keep_alive=keep_alive, timeout=120
+        )
+
         executor = RemoteConnection(
             ignore_proxy=options._ignore_local_proxy,
             client_config=client_config,

@@ -22,9 +22,11 @@ from contextlib import contextmanager
 from io import BytesIO
 
 from selenium.webdriver.common.driver_finder import DriverFinder
+from selenium.webdriver.common.utils import normalize_local_driver_config
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.remote_connection import FirefoxRemoteConnection
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.remote.client_config import ClientConfig
 from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 
 
@@ -39,6 +41,7 @@ class WebDriver(RemoteWebDriver):
         options: Options | None = None,
         service: Service | None = None,
         keep_alive: bool = True,
+        client_config: Optional[ClientConfig] = None,
     ) -> None:
         """Create a new instance of the Firefox driver, start the service, and create new instance.
 
@@ -46,6 +49,20 @@ class WebDriver(RemoteWebDriver):
             options: Instance of ``options.Options``.
             service: (Optional) service instance for managing the starting and stopping of the driver.
             keep_alive: Whether to configure remote_connection.RemoteConnection to use HTTP keep-alive.
+                This parameter is ignored if client_config is provided.
+            client_config: ClientConfig instance for advanced HTTP/WebSocket configuration.
+                If provided, takes precedence over individual parameters like keep_alive.
+
+        Example:
+            Basic usage::
+
+                driver = webdriver.Firefox()
+
+            With custom config::
+
+                from selenium.webdriver.remote.client_config import ClientConfig
+                config = ClientConfig(websocket_timeout=10)
+                driver = webdriver.Firefox(client_config=config)
         """
         self.service = service if service else Service()
         options = options if options else Options()
@@ -58,10 +75,15 @@ class WebDriver(RemoteWebDriver):
         self.service.path = self.service.env_path() or finder.get_driver_path()
         self.service.start()
 
+        client_config = normalize_local_driver_config(
+            self.service.service_url, user_config=client_config, keep_alive=keep_alive, timeout=120
+        )
+
         executor = FirefoxRemoteConnection(
             remote_server_addr=self.service.service_url,
             keep_alive=keep_alive,
             ignore_proxy=options._ignore_local_proxy,
+            client_config=client_config,
         )
 
         try:

@@ -18,6 +18,8 @@
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.driver_finder import DriverFinder
+from selenium.webdriver.common.utils import normalize_local_driver_config
+from selenium.webdriver.remote.client_config import ClientConfig
 from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 from selenium.webdriver.safari.options import Options
 from selenium.webdriver.safari.remote_connection import SafariRemoteConnection
@@ -29,17 +31,32 @@ class WebDriver(RemoteWebDriver):
 
     def __init__(
         self,
-        keep_alive=True,
+        keep_alive: bool = True,
         options: Options | None = None,
         service: Service | None = None,
+        client_config: ClientConfig | None = None,
     ) -> None:
         """Create a new Safari driver instance and launch or find a running safaridriver service.
 
         Args:
             keep_alive: Whether to configure SafariRemoteConnection to use
                 HTTP keep-alive. Defaults to True.
+                This parameter is ignored if client_config is provided.
             options: Instance of ``options.Options``.
             service: Service object for handling the browser driver if you need to pass extra details
+            client_config: ClientConfig instance for advanced HTTP/WebSocket configuration.
+                If provided, takes precedence over individual parameters like keep_alive.
+
+        Example:
+            Basic usage::
+
+                driver = webdriver.Safari()
+
+            With custom config::
+
+                from selenium.webdriver.remote.client_config import ClientConfig
+                config = ClientConfig(websocket_timeout=10)
+                driver = webdriver.Safari(client_config=config)
         """
         self.service = service if service else Service()
         options = options if options else Options()
@@ -49,10 +66,15 @@ class WebDriver(RemoteWebDriver):
         if not self.service.reuse_service:
             self.service.start()
 
+        client_config = normalize_local_driver_config(
+            self.service.service_url, user_config=client_config, keep_alive=keep_alive, timeout=120
+        )
+
         executor = SafariRemoteConnection(
             remote_server_addr=self.service.service_url,
             keep_alive=keep_alive,
             ignore_proxy=options._ignore_local_proxy,
+            client_config=client_config,
         )
 
         try:
