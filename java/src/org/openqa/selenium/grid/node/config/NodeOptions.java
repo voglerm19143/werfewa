@@ -241,21 +241,22 @@ public class NodeOptions {
               + "Issues related to parallel testing with Internet Explored won't be accepted.");
       LOG.warning("Double check if enabling 'override-max-sessions' is really needed");
     }
-    int maxSessions = getMaxSessions();
-    if (maxSessions > DEFAULT_MAX_SESSIONS) {
-      LOG.log(Level.WARNING, "Max sessions set to {0} ", maxSessions);
-    }
-
-    Map<WebDriverInfo, Collection<SessionFactory>> allDrivers =
-        discoverDrivers(maxSessions, factoryFactory);
+    Map<WebDriverInfo, Collection<SessionFactory>> allDrivers = discoverDrivers(factoryFactory);
 
     ImmutableMultimap.Builder<Capabilities, SessionFactory> sessionFactories =
         ImmutableMultimap.builder();
 
     addDriverFactoriesFromConfig(sessionFactories);
-    addDriverConfigs(factoryFactory, sessionFactories, maxSessions);
+    addDriverConfigs(factoryFactory, sessionFactories);
     addSpecificDrivers(allDrivers, sessionFactories);
     addDetectedDrivers(allDrivers, sessionFactories);
+
+    // Log final max sessions after all drivers are configured
+    int finalMaxSessions = getMaxSessions();
+    LOG.log(Level.INFO, "Node concurrent sessions: {0}", finalMaxSessions);
+    if (finalMaxSessions > DEFAULT_MAX_SESSIONS) {
+      LOG.log(Level.WARNING, "Max sessions set to {0} ", finalMaxSessions);
+    }
 
     return sessionFactories.build().asMap();
   }
@@ -265,10 +266,274 @@ public class NodeOptions {
     Require.positive("Driver max sessions", maxSessions);
     boolean overrideMaxSessions =
         config.getBool(NODE_SECTION, "override-max-sessions").orElse(OVERRIDE_MAX_SESSIONS);
-    if (maxSessions > DEFAULT_MAX_SESSIONS && overrideMaxSessions) {
-      return maxSessions;
+
+    // Always calculate sum of actual driver sessions for consistency
+    int totalActualSessions = calculateTotalMaxSessionsFromAllDrivers();
+
+    if (overrideMaxSessions) {
+      return totalActualSessions;
+    } else {
+      // When explicit max-sessions is provided and within CPU cores, use it; otherwise cap at CPU
+      // cores
+      boolean hasExplicitMaxSessions = config.get(NODE_SECTION, "max-sessions").isPresent();
+      if (hasExplicitMaxSessions && maxSessions <= DEFAULT_MAX_SESSIONS) {
+        return maxSessions;
+      } else {
+        return totalActualSessions > 0
+            ? Math.min(totalActualSessions, DEFAULT_MAX_SESSIONS)
+            : Math.min(maxSessions, DEFAULT_MAX_SESSIONS);
+      }
     }
-    return Math.min(maxSessions, DEFAULT_MAX_SESSIONS);
+  }
+
+  /**
+   * Safely parse an integer value for max-sessions with validation and logging. Guards against
+   * NumberFormatException and ensures the value is positive.
+   *
+   * @param value the string value to parse
+   * @param defaultValue the default value to use if parsing fails or value is invalid
+   * @param context descriptive context for logging (e.g., "driver config", "node config")
+   * @return a valid positive integer, or the default value if parsing fails
+   */
+  private static int parseMaxSessionsSafely(String value, int defaultValue, String context) {
+    if (value == null || value.trim().isEmpty()) {
+      LOG.log(
+          Level.WARNING,
+          "Max-sessions value is null or empty for {0}, using default: {1}",
+          new Object[] {context, defaultValue});
+      return defaultValue;
+    }
+
+    try {
+      int parsedValue = Integer.parseInt(value.trim());
+      if (parsedValue <= 0) {
+        LOG.log(
+            Level.WARNING,
+            "Max-sessions value {0} is not positive for {1}, using default: {2}",
+            new Object[] {parsedValue, context, defaultValue});
+        return defaultValue;
+      }
+      return parsedValue;
+    } catch (NumberFormatException e) {
+      LOG.log(
+          Level.WARNING,
+          "Invalid max-sessions value ''{0}'' for {1}, using default: {2}. Error: {3}",
+          new Object[] {value, context, defaultValue, e.getMessage()});
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Calculate the actual max-sessions per driver config based on the current configuration. This
+   * method ensures consistency between getMaxSessions() and actual session allocation.
+   */
+  private Map<String, Integer> calculateActualMaxSessionsPerDriverConfig() {
+    Map<String, Integer> result = new HashMap<>();
+    boolean overrideMaxSessions =
+        config.getBool(NODE_SECTION, "override-max-sessions").orElse(OVERRIDE_MAX_SESSIONS);
+    int nodeMaxSessions = config.getInt(NODE_SECTION, "max-sessions").orElse(DEFAULT_MAX_SESSIONS);
+
+    // Handle explicit driver configurations
+    Optional<List<List<String>>> driverConfigs =
+        config.getArray(NODE_SECTION, "driver-configuration");
+    if (driverConfigs.isPresent()) {
+      List<List<String>> drivers = driverConfigs.get();
+      if (drivers.isEmpty()) {
+        config.getAll(NODE_SECTION, "driver-configuration").ifPresent(drivers::add);
+      }
+
+      List<Map<String, String>> configList = new ArrayList<>();
+      for (List<String> driver : drivers) {
+        Map<String, String> configMap = new HashMap<>();
+        for (String setting : driver) {
+          String[] values = setting.split("=", 2);
+          if (values.length == 2) {
+            configMap.put(values[0], unquote(values[1]));
+          }
+        }
+        if (configMap.containsKey("display-name") && configMap.containsKey("stereotype")) {
+          configList.add(configMap);
+        }
+      }
+
+      if (!configList.isEmpty()) {
+        if (overrideMaxSessions) {
+          // When override-max-sessions = true, use explicit values or node default
+          for (Map<String, String> configMap : configList) {
+            String displayName = configMap.get("display-name");
+            int driverMaxSessions =
+                parseMaxSessionsSafely(
+                    configMap.get("max-sessions"),
+                    nodeMaxSessions,
+                    "driver config '" + displayName + "'");
+            result.put(displayName, driverMaxSessions);
+          }
+        } else {
+          // When override-max-sessions = false, use optimized CPU distribution
+          List<String> driverNames =
+              configList.stream()
+                  .map(config -> config.get("display-name"))
+                  .collect(Collectors.toList());
+          boolean hasExplicitMaxSessions = nodeMaxSessions > DEFAULT_MAX_SESSIONS;
+          Map<String, Integer> sessionsPerDriver =
+              calculateOptimizedCpuDistribution(driverNames, false, hasExplicitMaxSessions);
+
+          for (Map<String, String> configMap : configList) {
+            String displayName = configMap.get("display-name");
+            int driverMaxSessions = sessionsPerDriver.getOrDefault(displayName, 1);
+
+            // Check if driver config has explicit max-sessions within allowed range
+            if (configMap.containsKey("max-sessions")) {
+              int explicitMaxSessions =
+                  parseMaxSessionsSafely(
+                      configMap.get("max-sessions"),
+                      driverMaxSessions,
+                      "driver config '" + displayName + "' explicit max-sessions");
+              if (explicitMaxSessions >= 1 && explicitMaxSessions <= driverMaxSessions) {
+                driverMaxSessions = explicitMaxSessions;
+              }
+            } else {
+              // Only apply node max-sessions override if driver config doesn't have explicit
+              // max-sessions
+              if (nodeMaxSessions != DEFAULT_MAX_SESSIONS) {
+                if (nodeMaxSessions >= 1 && nodeMaxSessions <= driverMaxSessions) {
+                  driverMaxSessions = nodeMaxSessions;
+                }
+              }
+            }
+
+            result.put(displayName, driverMaxSessions);
+          }
+        }
+        return result;
+      }
+    }
+
+    // Handle detected drivers if no explicit configs
+    if (config.getBool(NODE_SECTION, "detect-drivers").orElse(DEFAULT_DETECT_DRIVERS)) {
+      List<WebDriverInfo> detectedDrivers = getDetectedDrivers();
+      if (!detectedDrivers.isEmpty()) {
+        if (overrideMaxSessions) {
+          // When override-max-sessions = true, each driver gets node max-sessions
+          for (WebDriverInfo info : detectedDrivers) {
+            if (info.getMaximumSimultaneousSessions() == 1
+                && SINGLE_SESSION_DRIVERS.contains(
+                    info.getDisplayName().toLowerCase(Locale.ENGLISH))) {
+              result.put(info.getDisplayName(), 1);
+            } else {
+              result.put(info.getDisplayName(), nodeMaxSessions);
+            }
+          }
+        } else {
+          // When override-max-sessions = false, use optimized CPU distribution
+          List<String> driverNames =
+              detectedDrivers.stream()
+                  .map(WebDriverInfo::getDisplayName)
+                  .collect(Collectors.toList());
+          boolean hasExplicitMaxSessions = false;
+          Map<String, Integer> sessionsPerDriver =
+              calculateOptimizedCpuDistribution(driverNames, true, hasExplicitMaxSessions);
+
+          // Check if node max-sessions is explicitly set and within allowed range
+          if (nodeMaxSessions < DEFAULT_MAX_SESSIONS) {
+            for (WebDriverInfo info : detectedDrivers) {
+              int calculatedSessions = sessionsPerDriver.get(info.getDisplayName());
+              if (nodeMaxSessions >= 1 && nodeMaxSessions <= calculatedSessions) {
+                result.put(info.getDisplayName(), nodeMaxSessions);
+              } else {
+                result.put(info.getDisplayName(), calculatedSessions);
+              }
+            }
+          } else {
+            result.putAll(sessionsPerDriver);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private Map<String, Integer> calculateOptimizedCpuDistribution(
+      List<String> driverNames, boolean detectDrivers, boolean hasExplicitMaxSessions) {
+    Map<String, Integer> sessionsPerDriver = new HashMap<>();
+
+    // When detect-drivers is true and no explicit max-sessions is provided,
+    // each driver should get the full number of processors (except single-session drivers)
+    if (detectDrivers && !hasExplicitMaxSessions) {
+      for (String driverName : driverNames) {
+        if (SINGLE_SESSION_DRIVERS.contains(driverName.toLowerCase(Locale.ENGLISH))) {
+          // Constrained drivers (like Safari) get exactly 1 session
+          sessionsPerDriver.put(driverName, 1);
+        } else {
+          // Flexible drivers get the full number of available processors
+          sessionsPerDriver.put(driverName, DEFAULT_MAX_SESSIONS);
+        }
+      }
+    } else {
+      // Original logic: distribute cores among drivers
+      int remainingCores = DEFAULT_MAX_SESSIONS;
+      List<String> flexibleDrivers = new ArrayList<>();
+
+      for (String driverName : driverNames) {
+        if (SINGLE_SESSION_DRIVERS.contains(driverName.toLowerCase(Locale.ENGLISH))) {
+          // Constrained drivers get exactly 1 session
+          sessionsPerDriver.put(driverName, 1);
+          remainingCores--;
+        } else {
+          flexibleDrivers.add(driverName);
+        }
+      }
+
+      // Then distribute remaining cores among flexible drivers
+      if (!flexibleDrivers.isEmpty() && remainingCores > 0) {
+        int sessionsPerFlexibleDriver = Math.max(1, remainingCores / flexibleDrivers.size());
+        int remainderCores = remainingCores % flexibleDrivers.size();
+
+        // Distribute base sessions to all flexible drivers
+        for (int i = 0; i < flexibleDrivers.size(); i++) {
+          String driverName = flexibleDrivers.get(i);
+          int sessions = sessionsPerFlexibleDriver;
+
+          // Distribute remainder cores to the first 'remainderCores' drivers
+          if (i < remainderCores) {
+            sessions++;
+          }
+
+          sessionsPerDriver.put(driverName, sessions);
+        }
+      } else if (!flexibleDrivers.isEmpty()) {
+        // No remaining cores, give each flexible driver 1 session
+        for (String driverName : flexibleDrivers) {
+          sessionsPerDriver.put(driverName, 1);
+        }
+      }
+    }
+
+    return sessionsPerDriver;
+  }
+
+  private int calculateTotalMaxSessionsFromAllDrivers() {
+    Map<String, Integer> actualMaxSessions = calculateActualMaxSessionsPerDriverConfig();
+    return actualMaxSessions.values().stream().mapToInt(Integer::intValue).sum();
+  }
+
+  private List<WebDriverInfo> getDetectedDrivers() {
+    List<WebDriverInfo> infos = new ArrayList<>();
+    if (config.getBool(NODE_SECTION, "selenium-manager").orElse(DEFAULT_USE_SELENIUM_MANAGER)) {
+      List<WebDriverInfo> driversSM =
+          StreamSupport.stream(ServiceLoader.load(WebDriverInfo.class).spliterator(), false)
+              .filter(WebDriverInfo::isAvailable)
+              .collect(Collectors.toList());
+      infos.addAll(driversSM);
+    } else {
+      List<WebDriverInfo> localDrivers =
+          StreamSupport.stream(ServiceLoader.load(WebDriverInfo.class).spliterator(), false)
+              .filter(WebDriverInfo::isPresent)
+              .collect(Collectors.toList());
+      infos.addAll(localDrivers);
+    }
+    return infos;
   }
 
   public int getConnectionLimitPerSession() {
@@ -392,8 +657,7 @@ public class NodeOptions {
 
   private void addDriverConfigs(
       Function<ImmutableCapabilities, Collection<SessionFactory>> factoryFactory,
-      ImmutableMultimap.Builder<Capabilities, SessionFactory> sessionFactories,
-      int maxSessions) {
+      ImmutableMultimap.Builder<Capabilities, SessionFactory> sessionFactories) {
 
     Multimap<WebDriverInfo, SessionFactory> driverConfigs = HashMultimap.create();
 
@@ -460,6 +724,10 @@ public class NodeOptions {
               List<WebDriverInfo> infoList = new ArrayList<>();
               ServiceLoader.load(WebDriverInfo.class).forEach(infoList::add);
 
+              // Get actual max-sessions per driver config from centralized calculation
+              Map<String, Integer> actualMaxSessionsPerConfig =
+                  calculateActualMaxSessionsPerDriverConfig();
+
               // iterate over driver configs
               configList.forEach(
                   thisConfig -> {
@@ -494,8 +762,6 @@ public class NodeOptions {
                     }
 
                     Capabilities stereotype = enhanceStereotype(confStereotype);
-                    String configName =
-                        thisConfig.getOrDefault("display-name", "Custom Slot Config");
 
                     WebDriverInfo info =
                         infoList.stream()
@@ -506,9 +772,11 @@ public class NodeOptions {
                                     new ConfigException(
                                         "Unable to find matching driver for %s", stereotype));
 
+                    // Use the centralized calculation for consistency
+                    String configName =
+                        thisConfig.getOrDefault("display-name", "Custom Slot Config");
                     int driverMaxSessions =
-                        Integer.parseInt(
-                            thisConfig.getOrDefault("max-sessions", String.valueOf(maxSessions)));
+                        actualMaxSessionsPerConfig.getOrDefault(configName, DEFAULT_MAX_SESSIONS);
                     Require.positive("Driver max sessions", driverMaxSessions);
 
                     WebDriverInfo driverInfoConfig =
@@ -622,7 +890,7 @@ public class NodeOptions {
   }
 
   private Map<WebDriverInfo, Collection<SessionFactory>> discoverDrivers(
-      int maxSessions, Function<ImmutableCapabilities, Collection<SessionFactory>> factoryFactory) {
+      Function<ImmutableCapabilities, Collection<SessionFactory>> factoryFactory) {
 
     if (!config.getBool(NODE_SECTION, "detect-drivers").orElse(DEFAULT_DETECT_DRIVERS)) {
       return ImmutableMap.of();
@@ -656,6 +924,15 @@ public class NodeOptions {
     List<DriverService.Builder<?, ?>> builders = new ArrayList<>();
     ServiceLoader.load(DriverService.Builder.class).forEach(builders::add);
 
+    // Get actual max-sessions per driver from centralized calculation
+    Map<String, Integer> actualMaxSessionsPerConfig = calculateActualMaxSessionsPerDriverConfig();
+    final Map<WebDriverInfo, Integer> sessionsPerDriver = new HashMap<>();
+    for (WebDriverInfo info : infos) {
+      int sessions =
+          actualMaxSessionsPerConfig.getOrDefault(info.getDisplayName(), DEFAULT_MAX_SESSIONS);
+      sessionsPerDriver.put(info, sessions);
+    }
+
     Multimap<WebDriverInfo, SessionFactory> toReturn = HashMultimap.create();
     infos.forEach(
         info -> {
@@ -666,7 +943,8 @@ public class NodeOptions {
               .ifPresent(
                   builder -> {
                     ImmutableCapabilities immutable = new ImmutableCapabilities(caps);
-                    int maxDriverSessions = getDriverMaxSessions(info, maxSessions);
+                    int driverMaxSessions = sessionsPerDriver.getOrDefault(info, 1);
+                    int maxDriverSessions = getDriverMaxSessions(info, driverMaxSessions);
                     for (int i = 0; i < maxDriverSessions; i++) {
                       toReturn.putAll(info, factoryFactory.apply(immutable));
                     }
@@ -735,7 +1013,14 @@ public class NodeOptions {
     }
     boolean overrideMaxSessions =
         config.getBool(NODE_SECTION, "override-max-sessions").orElse(OVERRIDE_MAX_SESSIONS);
-    if (desiredMaxSessions > info.getMaximumSimultaneousSessions() && overrideMaxSessions) {
+
+    if (!overrideMaxSessions) {
+      // When override-max-sessions = false, use the calculated sessions per driver config
+      return Math.min(info.getMaximumSimultaneousSessions(), desiredMaxSessions);
+    }
+
+    // When override-max-sessions = true, respect the driver config max-sessions
+    if (desiredMaxSessions > info.getMaximumSimultaneousSessions()) {
       String logMessage =
           String.format(
               "Overriding max recommended number of %s concurrent sessions for %s, setting it to"
