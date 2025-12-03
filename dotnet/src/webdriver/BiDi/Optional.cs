@@ -17,31 +17,36 @@
 // under the License.
 // </copyright>
 
+using OpenQA.Selenium.BiDi.Json.Converters;
 using System;
+using System.Text.Json.Serialization;
 
 namespace OpenQA.Selenium.BiDi;
 
+[JsonConverter(typeof(OptionalConverterFactory))]
 public readonly record struct Optional<T>
 {
-    private readonly T _value;
+    private readonly T? _value;
     public bool HasValue { get; }
 
-    public T Value => HasValue
+    public T? Value => HasValue
         ? _value
-        : throw new InvalidOperationException("Optional has no value. Check IsSet first.");
+        : throw new InvalidOperationException($"Optional has no value. Check {nameof(HasValue)} first.");
 
-    public Optional(T value)
+    public Optional(T? value)
     {
         _value = value;
         HasValue = true;
     }
 
-    public bool TryGetValue(out T value)
+    public bool TryGetValue(out T? value)
     {
         value = _value;
         return HasValue;
     }
 
+    public static Optional<T> None => default;
+
     // implicit conversion from T -> Optional<T>
-    public static implicit operator Optional<T>(T value) => new(value);
+    public static implicit operator Optional<T>(T? value) => new(value);
 }

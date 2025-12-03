@@ -86,7 +86,7 @@ public sealed class BrowsingContextModule : Module
 
     public async Task<SetViewportResult> SetViewportAsync(BrowsingContext context, SetViewportOptions? options = null)
     {
-        var @params = new SetViewportParameters(context, options?.Viewport, options?.DevicePixelRatio);
+        var @params = new SetViewportParameters(context, options?.Viewport ?? Optional<Viewport?>.None, options?.DevicePixelRatio ?? Optional<double?>.None);
 
         return await Broker.ExecuteCommandAsync(new SetViewportCommand(@params), options, _jsonContext.SetViewportCommand, _jsonContext.SetViewportResult).ConfigureAwait(false);
     }
@@ -292,4 +292,6 @@ public sealed class BrowsingContextModule : Module
 [JsonSerializable(typeof(NavigationInfo))]
 [JsonSerializable(typeof(UserPromptOpenedEventArgs))]
 [JsonSerializable(typeof(UserPromptClosedEventArgs))]
+[JsonSerializable(typeof(Viewport?))]
+[JsonSerializable(typeof(double?))]
 internal partial class BrowsingContextJsonSerializerContext : JsonSerializerContext;
