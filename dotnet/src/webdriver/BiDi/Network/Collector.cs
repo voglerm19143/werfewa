@@ -22,7 +22,7 @@ using System.Threading.Tasks;
 
 namespace OpenQA.Selenium.BiDi.Network;
 
-public sealed class Collector : IAsyncDisposable
+public sealed class Collector : IEquatable<Collector>, IAsyncDisposable
 {
     private readonly BiDi _bidi;
 
@@ -46,13 +46,16 @@ public sealed class Collector : IAsyncDisposable
 
     public override bool Equals(object? obj)
     {
-        if (obj is Collector collectortObj) return collectortObj.Id == Id;
+        return Equals(obj as Collector);
+    }
 
-        return false;
+    public bool Equals(Collector? other)
+    {
+        return other is not null && string.Equals(Id, other.Id, StringComparison.Ordinal);
     }
 
     public override int GetHashCode()
     {
-        return Id.GetHashCode();
+        return StringComparer.Ordinal.GetHashCode(Id);
     }
 }
