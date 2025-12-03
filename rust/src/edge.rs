@@ -29,6 +29,7 @@ use crate::{
     path_to_string,
 };
 use anyhow::Error;
+use anyhow::anyhow;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -284,6 +285,10 @@ impl SeleniumManager for EdgeManager {
             }
         } else if MACOS.is(os) {
             if ARM64.is(arch) { "mac64_m1" } else { "mac64" }
+        } else if LINUX.is(os) && ARM64.is(arch) {
+            return Err(anyhow!(
+                "Linux arm64 is not supported yet by Microsoft Edge. Please try another browser."
+            ));
         } else {
             "linux64"
         };
