@@ -61,6 +61,8 @@ module Selenium
         raise Error::WebDriverError, error_message(message) if message['error']
 
         message['result']
+      rescue StandardError => e
+        raise e, "Unable to send command #{method}: #{e.message}"
       end
 
       def error_message(message)
